@@ -83,8 +83,8 @@ const LocationCard = ({ result }: CardProps<Location>) => {
             )}
           </div>
           <div className="flex flex-col gap-2 text-center w-max">
-            <div className="px-4">{(distance / 1609.344).toFixed(2)}mi</div>
-            <a className="cta1" href={getDirectionsUrl(address)}>
+          <div className="px-4">{(distance / 1000).toFixed(2)} km</div>
+        <a className="cta1" href={getDirectionsUrl(address)}>
               Get Directions
             </a>
             <a href={`tel:${mainPhone}`} className="cta2">
