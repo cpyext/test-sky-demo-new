@@ -1,4 +1,3 @@
-// ✅ Full Updated Locator.tsx with collapsible filters, icons, counts, and dynamic map pins
 import {
   Matcher,
   SelectableStaticFilter,
@@ -23,10 +22,12 @@ import Loader from "./Loader";
 import LocationCard from "./LocationCard";
 import MapPin from "./MapPin";
 import { useLocationsContext } from "../common/LocationsContext";
-import { IoIosClose, IoStorefrontSharp } from "react-icons/io5";
-import { FaCheckCircle, FaMapMarkerAlt, FaChevronDown, FaChevronUp } from "react-icons/fa";
+import {
+  FaMapMarkerAlt,
+  FaChevronDown,
+  FaChevronUp,
+} from "react-icons/fa";
 
-// ✅ Type for props
 type PromoBanner = {
   url: string;
   alternateText?: string;
@@ -54,7 +55,6 @@ const Locator = ({ verticalKey, name, c_promoBanner }: LocatorProps) => {
   const searchActions = useSearchActions();
   const filters = useSearchState((state) => state.filters.static);
   const facets = useSearchState((state) => state.filters.facets);
-  const results = useSearchState((state) => state.vertical.results);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedLocationId, setSelectedLocationId] = useState("");
   const [highlightedFacetOption, setHighlightedFacetOption] = useState<string | null>(null);
@@ -74,8 +74,8 @@ const Locator = ({ verticalKey, name, c_promoBanner }: LocatorProps) => {
   useEffect(() => {
     searchActions.setVertical(verticalKey);
     const queryParams = new URLSearchParams(window.location.search);
-    let q = queryParams.get("query");
-    q && searchActions.setQuery(q);
+    const q = queryParams.get("query");
+    if (q) searchActions.setQuery(q);
     searchActions.executeVerticalQuery().then(() => setIsLoading(false));
   }, []);
 
@@ -84,17 +84,15 @@ const Locator = ({ verticalKey, name, c_promoBanner }: LocatorProps) => {
     searchActions.executeVerticalQuery();
     const queryParams = new URLSearchParams(window.location.search);
     queryParams.delete("type");
-    if (query) {
-      queryParams.set("query", query);
-    } else {
-      queryParams.delete("query");
-    }
+    if (query) queryParams.set("query", query);
+    else queryParams.delete("query");
     history.pushState(null, "", "?" + queryParams.toString());
   };
 
   const onDrag = React.useCallback(
     (center: LngLat, bounds: LngLatBounds) => {
-      const radius = center.distanceTo(bounds.getNorthEast());
+      const radiusInMiles = center.distanceTo(bounds.getNorthEast());
+      const radius = radiusInMiles * 1.60934;
       const nonLocationFilters =
         filters?.filter(
           (f) =>
@@ -116,6 +114,22 @@ const Locator = ({ verticalKey, name, c_promoBanner }: LocatorProps) => {
     },
     [filters, searchActions]
   );
+
+  const handleStaticFilterClick = (fieldId: string, value: string) => {
+    const filter: SelectableStaticFilter = {
+      selected: true,
+      displayName: value,
+      filter: {
+        kind: "fieldValue",
+        fieldId,
+        matcher: Matcher.Equals,
+        value,
+      },
+    };
+    searchActions.setStaticFilters([filter]);
+    setHighlightedFacetOption(value);
+    searchActions.executeVerticalQuery();
+  };
 
   return (
     <>
@@ -143,7 +157,6 @@ const Locator = ({ verticalKey, name, c_promoBanner }: LocatorProps) => {
             </div>
           )}
 
-          {/* Collapsible Filter Toggle */}
           <div className="mt-6 mb-4">
             <button
               className="text-md font-semibold flex items-center gap-2 text-blue-600 hover:underline"
@@ -153,44 +166,85 @@ const Locator = ({ verticalKey, name, c_promoBanner }: LocatorProps) => {
             </button>
           </div>
 
-          {/* Collapsible Filters */}
-          {showFilters && facets?.length > 0 && (
+          {/* START FILTERS */}
+          {showFilters && (
             <div className="mb-6">
-              <div className="flex flex-col gap-6">
-                {facets.map((facet, index) => (
-                  <div key={index}>
-                    <h3 className="text-lg font-bold mb-2">{facet.displayName}</h3>
-                    <div className="flex flex-col gap-2">
-                      {facet.options.map((option, i) => {
-                        const label = option.displayName || option.value;
-                        const color = getColorByOption(label);
-                        const isSelected = option.selected;
-                        const count = option.count || 0;
-                        return (
-                          <div
-                            key={i}
-                            className={`flex items-center justify-between px-3 py-2 border ${facet.displayName.includes("Store") ? "rounded-md" : ""}`}
-                            style={{ borderColor: color, backgroundColor: isSelected ? color + '22' : "transparent", cursor: "pointer" }}
-                            onClick={() => {
-                              searchActions.setFacetOption(facet.fieldId, option, !isSelected);
-                              setHighlightedFacetOption(label);
-                              searchActions.executeVerticalQuery();
-                            }}
-                          >
-                            <span className="flex items-center gap-2" style={{ color }}>
-                              <FaMapMarkerAlt className="text-sm" />
-                              <span className="font-semibold text-sm">{label}</span>
-                            </span>
-                            <span className="text-xs px-2 py-1 rounded-full bg-gray-200 text-gray-700">{count}</span>
-                          </div>
-                        );
-                      })}
+              <div className="flex flex-col gap-4">
+
+                {/* Store Type facet rendered as tabs */}
+                {facets
+                  ?.filter((facet) => facet.displayName.includes("Store"))
+                  .map((facet, index) => (
+                    <div key={index}>
+                      <h3 className="text-lg font-bold mb-2">{facet.displayName}</h3>
+                      <div className="flex gap-2 flex-wrap">
+                        {facet.options.map((option, i) => {
+                          const label = option.displayName || option.value;
+                          const color = getColorByOption(label);
+                          const isSelected = option.selected;
+                          const count = option.count || 0;
+                          return (
+                            <div
+                              key={i}
+                              className={`relative px-4 py-1 border rounded-full text-sm font-medium cursor-pointer flex items-center gap-1`}
+                              style={{
+                                borderColor: color,
+                                color: isSelected ? "#000000" : color,
+                                backgroundColor: isSelected ? color + "33" : "transparent",
+                              }}
+                              onClick={() => {
+                                searchActions.setFacetOption(facet.fieldId, option, !isSelected);
+                                setHighlightedFacetOption(label);
+                                searchActions.executeVerticalQuery();
+                              }}
+                            >
+                              <span>{isSelected ? "✔️" : "🔘"}</span>
+                              {label}
+                              {count > 0 && (
+                                <span className="text-xs bg-gray-200 text-gray-800 px-2 py-0.5 rounded-full ml-1">
+                                  {count}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+
+                {/* Vendita & Post Vendita as static buttons */}
+                <div className="flex gap-2 flex-wrap">
+                  {["Vendita", "Post Vendita"].map((label) => (
+                    <button
+                      key={label}
+                      className="flex items-center gap-1 px-4 py-1 border rounded-full text-sm font-medium"
+                      style={{
+                        borderColor: getColorByOption(label),
+                        color: "#000000",
+                        backgroundColor: getColorByOption(label) + "33",
+                      }}
+                      onClick={() => handleStaticFilterClick("custom.storeType", label)}
+                    >
+                      ✅ {label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Clear All Filters */}
+                <button
+                  className="self-start px-4 py-1 border text-sm rounded-full text-red-600 border-red-400 hover:bg-red-50 flex items-center gap-2"
+                  onClick={() => {
+                    searchActions.setStaticFilters([]);
+                    setHighlightedFacetOption(null);
+                    searchActions.executeVerticalQuery();
+                  }}
+                >
+                  ❌ Clear All Filters
+                </button>
               </div>
             </div>
           )}
+          {/* END FILTERS */}
 
           <div className="mt-6">
             <ResultsCount />
@@ -244,6 +298,7 @@ const Locator = ({ verticalKey, name, c_promoBanner }: LocatorProps) => {
                 selectedLocationId={selectedLocationId}
                 setSelectedLocationId={setSelectedLocationId}
                 selectedLocationFromContext={_selectedLocationId}
+                //pulse={true}
               />
             )}
           />
